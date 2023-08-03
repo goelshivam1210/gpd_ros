@@ -76,11 +76,12 @@ GraspDetectionNode::GraspDetectionNode(ros::NodeHandle& node) : has_cloud_(false
 void GraspDetectionNode::run()
 {
   ros::Rate rate(100);
-  ROS_INFO("Waiting for point cloud to arrive ...");
+  ROS_INFO("Waiting for first point cloud to arrive ...");
 
   while (ros::ok()) {
     if (has_cloud_) {
       // Detect grasps in point cloud.
+      ROS_INFO("About to detect grasps ...");
       std::vector<std::unique_ptr<gpd::candidate::Hand>> grasps = detectGraspPoses();
 
       // Visualize the detected grasps in rviz.
@@ -92,7 +93,7 @@ void GraspDetectionNode::run()
       has_cloud_ = false;
       has_samples_ = false;
       has_normals_ = false;
-      ROS_INFO("Waiting for point cloud to arrive ...");
+      ROS_INFO("Waiting for next point cloud to arrive ...");
     }
 
     ros::spinOnce();
@@ -146,14 +147,15 @@ std::vector<int> GraspDetectionNode::getSamplesInBall(const PointCloudRGBA::Ptr&
 
 void GraspDetectionNode::cloud_callback(const sensor_msgs::PointCloud2& msg)
 {
+  ROS_INFO_STREAM("Recieved cloud");
   if (!has_cloud_)
   {
     delete cloud_camera_;
     cloud_camera_ = NULL;
-
+    ROS_INFO_STREAM("Camera reset...");
     Eigen::Matrix3Xd view_points(3,1);
     view_points.col(0) = view_point_;
-
+    ROS_INFO_STREAM("Eigen...");
     if (msg.fields.size() == 6 && msg.fields[3].name == "normal_x" && msg.fields[4].name == "normal_y"
       && msg.fields[5].name == "normal_z")
     {
@@ -171,7 +173,7 @@ void GraspDetectionNode::cloud_callback(const sensor_msgs::PointCloud2& msg)
       cloud_camera_header_ = msg.header;
       ROS_INFO_STREAM("Received cloud with " << cloud_camera_->getCloudProcessed()->size() << " points.");
     }
-
+    ROS_INFO_STREAM("The if else has passed...");
     has_cloud_ = true;
     frame_ = msg.header.frame_id;
   }
@@ -183,7 +185,7 @@ void GraspDetectionNode::cloud_indexed_callback(const gpd_ros::CloudIndexed& msg
   if (!has_cloud_)
   {
     initCloudCamera(msg.cloud_sources);
-
+    
     // Set the indices at which to sample grasp candidates.
     std::vector<int> indices(msg.indices.size());
     for (int i=0; i < indices.size(); i++)
@@ -191,10 +193,10 @@ void GraspDetectionNode::cloud_indexed_callback(const gpd_ros::CloudIndexed& msg
       indices[i] = msg.indices[i].data;
     }
     cloud_camera_->setSampleIndices(indices);
-
+    
     has_cloud_ = true;
     frame_ = msg.cloud_sources.cloud.header.frame_id;
-
+    
     ROS_INFO_STREAM("Received cloud with " << cloud_camera_->getCloudProcessed()->size() << " points, and "
       << msg.indices.size() << " samples");
   }
@@ -202,11 +204,12 @@ void GraspDetectionNode::cloud_indexed_callback(const gpd_ros::CloudIndexed& msg
 
 
 void GraspDetectionNode::cloud_samples_callback(const gpd_ros::CloudSamples& msg)
-{
+{ ROS_INFO_STREAM("Before");
   if (!has_cloud_)
   {
+    ROS_INFO_STREAM("Camera1");
     initCloudCamera(msg.cloud_sources);
-
+    ROS_INFO_STREAM("Camera2");
     // Set the samples at which to sample grasp candidates.
     Eigen::Matrix3Xd samples(3, msg.samples.size());
     for (int i=0; i < msg.samples.size(); i++)
@@ -214,11 +217,11 @@ void GraspDetectionNode::cloud_samples_callback(const gpd_ros::CloudSamples& msg
       samples.col(i) << msg.samples[i].x, msg.samples[i].y, msg.samples[i].z;
     }
     cloud_camera_->setSamples(samples);
-
+    ROS_INFO_STREAM("Cloud Camera");
     has_cloud_ = true;
     has_samples_ = true;
     frame_ = msg.cloud_sources.cloud.header.frame_id;
-
+    ROS_INFO_STREAM("3rd comment");
     ROS_INFO_STREAM("Received cloud with " << cloud_camera_->getCloudProcessed()->size() << " points, and "
       << cloud_camera_->getSamples().cols() << " samples");
   }
@@ -246,17 +249,25 @@ void GraspDetectionNode::samples_callback(const gpd_ros::SamplesMsg& msg)
 
 void GraspDetectionNode::initCloudCamera(const gpd_ros::CloudSources& msg)
 {
+  if (!has_cloud_ )
+    {
+        if(!cloud_camera_)
+        delete cloud_camera_;
+      cloud_camera_ = NULL;
+    }
   // clean up
-  delete cloud_camera_;
-  cloud_camera_ = NULL;
-
+  ROS_INFO_STREAM("Before clean up");
+  
+  ROS_INFO_STREAM("After Delete");
+  // cloud_camera_ = NULL;
+  ROS_INFO_STREAM("Clean up");
   // Set view points.
   Eigen::Matrix3Xd view_points(3, msg.view_points.size());
   for (int i = 0; i < msg.view_points.size(); i++)
   {
     view_points.col(i) << msg.view_points[i].x, msg.view_points[i].y, msg.view_points[i].z;
   }
-
+  ROS_INFO_STREAM("Matrix view points");
   // Set point cloud.
   if (msg.cloud.fields.size() == 6 && msg.cloud.fields[3].name == "normal_x"
     && msg.cloud.fields[4].name == "normal_y" && msg.cloud.fields[5].name == "normal_z")
@@ -288,6 +299,7 @@ void GraspDetectionNode::initCloudCamera(const gpd_ros::CloudSources& msg)
     cloud_camera_ = new gpd::util::Cloud(cloud, camera_source, view_points);
     std::cout << "view_points:\n" << view_points << "\n";
   }
+  ROS_INFO_STREAM("Set point cloud");
 }
 
 int main(int argc, char** argv)
