@@ -249,6 +249,12 @@ void GraspDetectionNode::samples_callback(const gpd_ros::SamplesMsg& msg)
 
 void GraspDetectionNode::initCloudCamera(const gpd_ros::CloudSources& msg)
 {
+  /*
+  added to prevent GPD from crashing when receiving second point cloud
+  ToDo: we have a memory leak that needs to be fixed for later
+  As GPD takes in point clouds and creates grasps it doesnt clear the buffer and 
+  keeps addding into it resulting into a memory leak.
+  */
   if (!has_cloud_ )
     {
         if(!cloud_camera_)
@@ -256,18 +262,13 @@ void GraspDetectionNode::initCloudCamera(const gpd_ros::CloudSources& msg)
       cloud_camera_ = NULL;
     }
   // clean up
-  ROS_INFO_STREAM("Before clean up");
   
-  ROS_INFO_STREAM("After Delete");
-  // cloud_camera_ = NULL;
-  ROS_INFO_STREAM("Clean up");
   // Set view points.
   Eigen::Matrix3Xd view_points(3, msg.view_points.size());
   for (int i = 0; i < msg.view_points.size(); i++)
   {
     view_points.col(i) << msg.view_points[i].x, msg.view_points[i].y, msg.view_points[i].z;
   }
-  ROS_INFO_STREAM("Matrix view points");
   // Set point cloud.
   if (msg.cloud.fields.size() == 6 && msg.cloud.fields[3].name == "normal_x"
     && msg.cloud.fields[4].name == "normal_y" && msg.cloud.fields[5].name == "normal_z")
@@ -299,7 +300,6 @@ void GraspDetectionNode::initCloudCamera(const gpd_ros::CloudSources& msg)
     cloud_camera_ = new gpd::util::Cloud(cloud, camera_source, view_points);
     std::cout << "view_points:\n" << view_points << "\n";
   }
-  ROS_INFO_STREAM("Set point cloud");
 }
 
 int main(int argc, char** argv)
